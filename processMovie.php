@@ -1,32 +1,64 @@
 <?php
-//start a new session
 session_start();
 
-$page_title = "Add Movie";
-
-require_once 'includes/header.php';
 require_once 'includes/database.php';
 
-$title = $_GET['movie_name'];
-$year = $_GET['movie_year'];
-$bio = $_GET['bio'];
-$rating = $_GET['rating'];
-$image =  $_GET['image'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = isset($_POST['movie_name']) ? $_POST['movie_name'] : '';
+    $year = isset($_POST['movie_year']) ? $_POST['movie_year'] : '';
+    $bio = isset($_POST['bio']) ? $_POST['bio'] : '';
+    $rating = isset($_POST['rating']) ? $_POST['rating'] : '';
+    $image = isset($_POST['image']) ? $_POST['image'] : '';
 
-//define sql statement
-$query_str = "INSERT INTO movies VALUES (NULL, '$title', '$year', '$rating', '$bio', '$image')";
+    // Extract selected genres
+    $selectedGenres = isset($_POST['genres']) ? $_POST['genres'] : [];
 
-//execute the query
-$result = @$conn->query($query_str);
+    // Insert movie details into the movies table using prepared statements
+    $insertMovieQuery = $conn->prepare("INSERT INTO movies (movie_name, movie_year, movie_bio, movie_rating, movie_img, genre_name) 
+                                       VALUES (?, ?, ?, ?, ?, ?)");
+    $insertMovieQuery->bind_param("ssssss", $title, $year, $bio, $rating, $image, implode(',', $selectedGenres));
+    
+    // Execute the prepared statement
+    $result = $insertMovieQuery->execute();
 
-//handle error
-if(!$result) {
-  $errno = $conn->errno;
-  $errmsg = $conn->error;
-  echo "Insertion failed with: ($errno) $errmsg<br/>\n";
-  $conn->close();
-  exit;
+    // Handle error
+    if (!$result) {
+        $errno = $insertMovieQuery->errno;
+        $errmsg = $insertMovieQuery->error;
+        echo "Insertion failed with: ($errno) $errmsg<br/>\n";
+        $insertMovieQuery->close();
+        $conn->close();
+        exit;
+    }
+
+    // Get the ID of the last inserted movie
+    $lastMovieId = $insertMovieQuery->insert_id;
+
+    // Insert movie-genre relationships into the movie_genres table
+    foreach ($selectedGenres as $genreId) {
+        $insertGenreQuery = "INSERT INTO movie_genres (movie_id, genre_id) 
+                             VALUES ($lastMovieId, $genreId)";
+        $result = @$conn->query($insertGenreQuery);
+
+        // Handle error
+        if (!$result) {
+            $errno = $conn->errno;
+            $errmsg = $conn->error;
+            echo "Genre insertion failed with: ($errno) $errmsg<br/>\n";
+            $insertMovieQuery->close();
+            $conn->close();
+            exit;
+        }
+    }
+
+    // Close the prepared statement
+    $insertMovieQuery->close();
+
+    header("Location: movies.php");
+    exit();
+} else {
+    // Handle invalid requests
+    header("Location: index.php");
+    exit();
 }
-
-
-header("Location: movies.php");
+?>

@@ -1,3 +1,4 @@
+
 <?php
 //start a new session
 session_start();
@@ -21,7 +22,8 @@ $query_str = "SELECT * FROM users WHERE user_name='$user_name' && user_password=
 //execute the query
 $result = @$conn->query($query_str);
 
-//handle error
+
+
 if(!$result) {
   $errno = $conn->errno;
   $errmsg = $conn->error;
@@ -30,6 +32,11 @@ if(!$result) {
   exit;
 }
 
+if (strlen($password) < 8) {
+  // Display an alert box to the user.
+  echo '<script type="text/javascript">alert("Password should be at least 8 characters long."); window.location.href = "registration.php";</script>';
+  return;
+}
 if($result -> num_rows == 0) {
   //Insert statement
   $query_stry = "INSERT INTO users VALUES (NULL, '$user_name', '$full_name', '$user_email', '$password', '$role')";
